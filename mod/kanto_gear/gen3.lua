@@ -658,6 +658,14 @@ function Gen3:encounters(mapId)
   local source = self.game.data and self.game.data.gen3Encounters or {}
   local area, rows = source[mapId], {}
   if not self.data.maps[mapId] then return rows end
+
+  -- Prefer the engine's live encounter resolver so encounter-overhaul mods
+  -- are reflected in Gear instead of showing only the ROM-extracted table.
+  local ok, Encounters = pcall(require, "src.core.game3.encounters")
+  if ok and Encounters and type(Encounters.tableFor) == "function" then
+    local resolved = Encounters.tableFor(mapId)
+    if type(resolved) == "table" then area = resolved end
+  end
   for _, pool in ipairs(pools) do
     local encounter = area and area[pool.key]
     if encounter and (pool.key == "fishing" or (tonumber(encounter.rate) or 0) > 0) then
