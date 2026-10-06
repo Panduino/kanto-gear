@@ -5,25 +5,33 @@ local names = { [0] = "KANTO", "SEVII 1-3", "SEVII 4-5", "SEVII 6-7" }
 local images = { [0] = "kanto_map", "sevii123_map", "sevii45_map", "sevii67_map" }
 
 function Region.new(adapter, graphics, mod)
-  local hoennCompat
-  if mod and mod.find then
-    local ok, provider = pcall(mod.find, mod, "hoenn_journey_firered")
-    local exports = ok and provider and provider.exports
-    if exports and type(exports.kantoGearRegion) == "function" then
-      hoennCompat = exports.kantoGearRegion
-    end
-  end
-  if adapter.profile.id == "emerald" or hoennCompat then
+  if adapter.profile.id == "emerald" then
     return setmetatable({ adapter = adapter, graphics = graphics, mod = mod,
-      hoennCompat = hoennCompat,
       Hoenn = require("src.ui.game3.rse.region_map"),
       Kit = require("src.ui.game3.rse.scene_kit") }, Region)
   end
   local Extract = require("src.import.gba.region_map_extract")
   Extract.ensureGenerated()
-  return setmetatable({ adapter = adapter, graphics = graphics, Extract = Extract,
+  return setmetatable({ adapter = adapter, graphics = graphics, mod = mod,
+    Extract = Extract,
     Position = require("src.ui.game3.region_map_position"),
     Gpu = require("src.ui.game3.region_map_gpu") }, Region)
+end
+
+function Region:compatRegion()
+  if not (self.mod and self.mod.find) then return nil end
+  local ok, provider = pcall(self.mod.find, self.mod, "hoenn_journey_firered")
+  local exports = ok and provider and provider.exports
+  if not (exports and type(exports.kantoGearRegion) == "function") then return nil end
+  local called, region = pcall(exports.kantoGearRegion, self.adapter.session)
+  return called and region or nil
+end
+
+function Region:ensureHoenn()
+  if not self.Hoenn then
+    self.Hoenn = require("src.ui.game3.rse.region_map")
+    self.Kit = require("src.ui.game3.rse.scene_kit")
+  end
 end
 
 function Region:position()
@@ -44,13 +52,11 @@ function Region:position()
 end
 
 function Region:model(area, marker)
-  if self.Hoenn then
-    local useHoenn = self.adapter.profile.id == "emerald"
-    if not useHoenn and self.hoennCompat then
-      local ok, region = pcall(self.hoennCompat, self.adapter.session)
-      useHoenn = ok and region == "hoenn"
-    end
-    if useHoenn then return self:hoennModel(area, marker) end
+  local useHoenn = self.adapter.profile.id == "emerald"
+    or self:compatRegion() == "hoenn"
+  if useHoenn then
+    self:ensureHoenn()
+    return self:hoennModel(area, marker)
   end
   local region, px, py = self:position()
   local model = { area = area, region = names[region] or "MAP" }
