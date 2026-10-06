@@ -5647,7 +5647,7 @@ return function(mod)
     if displayRuntime.gen3 then
       if not displayRuntime.gen3Region then
         displayRuntime.gen3Region = assert(load(mod:read("gen3_region.lua"),
-          "@kanto_gear/gen3_region.lua"))().new(displayRuntime.gen3, G)
+          "@kanto_gear/gen3_region.lua"))().new(displayRuntime.gen3, G, mod)
       end
       return displayRuntime.gen3Region:model(areaName(mapId), compat.drawMapMarker)
     end
