@@ -4,9 +4,18 @@ Region.__index = Region
 local names = { [0] = "KANTO", "SEVII 1-3", "SEVII 4-5", "SEVII 6-7" }
 local images = { [0] = "kanto_map", "sevii123_map", "sevii45_map", "sevii67_map" }
 
-function Region.new(adapter, graphics)
-  if adapter.profile.id == "emerald" then
-    return setmetatable({ adapter = adapter, graphics = graphics,
+function Region.new(adapter, graphics, mod)
+  local hoennCompat
+  if mod and mod.find then
+    local ok, provider = pcall(mod.find, mod, "hoenn_journey_firered")
+    local exports = ok and provider and provider.exports
+    if exports and type(exports.kantoGearRegion) == "function" then
+      hoennCompat = exports.kantoGearRegion
+    end
+  end
+  if adapter.profile.id == "emerald" or hoennCompat then
+    return setmetatable({ adapter = adapter, graphics = graphics, mod = mod,
+      hoennCompat = hoennCompat,
       Hoenn = require("src.ui.game3.rse.region_map"),
       Kit = require("src.ui.game3.rse.scene_kit") }, Region)
   end
@@ -35,7 +44,14 @@ function Region:position()
 end
 
 function Region:model(area, marker)
-  if self.Hoenn then return self:hoennModel(area, marker) end
+  if self.Hoenn then
+    local useHoenn = self.adapter.profile.id == "emerald"
+    if not useHoenn and self.hoennCompat then
+      local ok, region = pcall(self.hoennCompat, self.adapter.session)
+      useHoenn = ok and region == "hoenn"
+    end
+    if useHoenn then return self:hoennModel(area, marker) end
+  end
   local region, px, py = self:position()
   local model = { area = area, region = names[region] or "MAP" }
   if region == nil then return model end
